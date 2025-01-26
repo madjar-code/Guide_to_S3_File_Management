@@ -1,0 +1,47 @@
+x-linux-container-environment:
+  &common-linux-container-environment-variables
+  TZ: "Europe/Paris"
+
+services:
+  backend:
+    build:
+      dockerfile: ./backend/Dockerfile
+    volumes:
+      - ./backend/:/code/app/:z
+    image: "backend:latest"
+    ports:
+      - ${BACKEND_EXTERNAL_PORT}:${BACKEND_INTERNAL_PORT}
+    # user: "{UID}:${GID}"
+    environment:
+      <<: *common-linux-container-environment-variables
+      S3_INTERNAL_PORT: ${S3_INTERNAL_PORT}
+      S3_EXTERNAL_PORT: ${S3_EXTERNAL_PORT}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_REGION: ${S3_REGION}
+      S3_REQUIRE_TLS: ${S3_REQUIRE_TLS}
+      IS_PROXY_REQUIRED: ${IS_PROXY_REQUIRED}
+      S3_EXTERNAL_HOST: ${S3_EXTERNAL_HOST}
+      S3_INTERNAL_URL: ${S3_INTERNAL_URL}
+    command: uvicorn main:app --host 0.0.0.0 --port ${BACKEND_INTERNAL_PORT}
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:latest
+    ports:
+      - ${S3_EXTERNAL_PORT}:${S3_INTERNAL_PORT}
+      - ${MINIO_CONSOLE_EXTERNAL_PORT}:${MINIO_CONSOLE_INTERNAL_PORT}
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - minio-data:/data
+      - minio-config:/root/.minio
+    command: server /data --console-address ":${MINIO_CONSOLE_INTERNAL_PORT}"
+    restart: unless-stopped
+
+
+volumes:
+  minio-data:
+  minio-config:
